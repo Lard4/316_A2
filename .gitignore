@@ -1,0 +1,8 @@
+.cproject
+.ccs*
+.project
+.launches/
+.settings/
+/Debug
+/Release
+
