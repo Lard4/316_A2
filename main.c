@@ -58,3 +58,4 @@ void test_LED(uint32_t us, uint32_t frequency) {
     delay_us(us, frequency);
     PORT_TEST_LED_OUT->OUT &= ~BIT_TEST_LED_OUT;  // turn off
 }
+
