@@ -3,12 +3,14 @@
 #include <stdio.h>
 #include "msp.h"
 
-#define MAX_FREQ_MHZ _48_MHZ
+#define MAX_FREQ_MHZ _24_MHZ
 #define MIN_FREQ_MHZ _1_5_MHZ
 
-#define _48_MHZ 48000000
-#define _1_5_MHZ 1500000
-#define _20_MHZ 20000000
+#define _1_5_MHZ  CS_CTL0_DCORSEL_0
+#define _3_MHZ    CS_CTL0_DCORSEL_1
+#define _6_MHZ    CS_CTL0_DCORSEL_2
+#define _12_MHZ   CS_CTL0_DCORSEL_3
+#define _24_MHZ   CS_CTL0_DCORSEL_4
 
 #define PORT_TEST_LED_OUT (P1)
 #define BIT_TEST_LED_OUT (BIT0)
@@ -17,40 +19,34 @@
 #define BITM_MCLK_OUT (BIT3)
 
 
-void set_MCLK_DCO(uint32_t);
+void set_MCLK_DCO(int);
 void output_MCLK();
-int us_to_loops(int);
+int us_to_loops(uint32_t, int);
 void delay(uint32_t);
+void test_LED(int);
 
 
 void main(void) {
 	WDT_A->CTL = WDT_A_CTL_PW | WDT_A_CTL_HOLD;		// stop watchdog timer
-	set_MCLK_DCO(_20_MHZ);
+
+	const int frequency = _3_MHZ;
+
+	set_MCLK_DCO(frequency);
 	output_MCLK();
+	test_LED(frequency);
 
-	// configure the test LED
-    PORT_TEST_LED_OUT->SEL0 &= ~BIT_TEST_LED_OUT;  // simp io
-    PORT_TEST_LED_OUT->SEL1 &= ~BIT_TEST_LED_OUT;  // simp io
-    PORT_TEST_LED_OUT->DIR |= BIT_TEST_LED_OUT;    // output
-    PORT_TEST_LED_OUT->OUT &= ~BIT_TEST_LED_OUT;   // turn off
-
-    // time the function with a LED output
-    int loops = us_to_loops(1000000);
-    printf("loops = %d", loops);
-    PORT_TEST_LED_OUT->OUT |= BIT_TEST_LED_OUT;  // turn on
-    delay(loops);
-    PORT_TEST_LED_OUT->OUT &= ~BIT_TEST_LED_OUT;  // turn off
+	while(1);
 }
 
 // a function to use the DCO as the source for MCLK and set the
 // DCO frequency in MHz
-void set_MCLK_DCO(uint32_t frequency) {
+void set_MCLK_DCO(int frequency) {
     assert(frequency <= MAX_FREQ_MHZ);
     assert(frequency >= MIN_FREQ_MHZ);
 
     CS->KEY = CS_KEY_VAL;  // unlock CS
     CS->CTL0 = frequency;
-    CS->CTL1 |= CS_CTL1_SELM__DCOCLK; // sets MCLK
+    CS->CTL1 |= CS_CTL1_SELM__DCOCLK | CS_CTL1_DIVM__1; // set MCLK=(div by 1)
 }
 
 // output the MCLK on P4.3
@@ -64,6 +60,10 @@ void output_MCLK() {
 // 100000 loops = 291ms
 // 1us = .344 loops
 // 3us ~= 1 loop for 20MHz
+
+
+// 10000 loops = 0.107s @1.5MHz
+// 9.3458 loops = 100us @1.5MHz
 void delay(uint32_t loops) {
     // NOTE: REQUIRES -o0 to work
     uint32_t i;
@@ -73,6 +73,34 @@ void delay(uint32_t loops) {
     }
 }
 
-int us_to_loops(int us) {
-    return roundf((float)us * (float)0.344);
+int us_to_loops(uint32_t us, int frequency) {
+    float std_loops = (float)us * 0.093458;
+    int time_comp = 1;
+    if (frequency != _1_5_MHZ) {
+        time_comp = 1 + (frequency / 0x10000);
+    }
+
+    printf("std_loops = %f\ntime_comp = %d\n", std_loops, time_comp);
+
+    return roundf(std_loops * time_comp);
+}
+
+void test_LED(int frequency) {
+    // configure the test LED
+    PORT_TEST_LED_OUT->SEL0 &= ~BIT_TEST_LED_OUT;  // simp io
+    PORT_TEST_LED_OUT->SEL1 &= ~BIT_TEST_LED_OUT;  // simp io
+    PORT_TEST_LED_OUT->DIR |= BIT_TEST_LED_OUT;    // output
+    PORT_TEST_LED_OUT->OUT &= ~BIT_TEST_LED_OUT;   // turn off
+
+    // setup time
+    __delay_cycles(100);
+
+    // time the function with a LED output
+    const int loops = us_to_loops(200000, frequency);
+    printf("loops = %d\n", loops);
+    fflush(stdout);
+
+    PORT_TEST_LED_OUT->OUT |= BIT_TEST_LED_OUT;  // turn on
+    delay(loops);
+    PORT_TEST_LED_OUT->OUT &= ~BIT_TEST_LED_OUT;  // turn off
 }
