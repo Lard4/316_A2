@@ -5,6 +5,9 @@
 #define MAX_FREQ_MHZ _24_MHZ
 #define MIN_FREQ_MHZ _1_5_MHZ
 
+#define _40_MILLIS_AS_MICROS 40000
+#define _40_MICROS 40
+
 #define PORT_TEST_LED_OUT (P1)
 #define BIT_TEST_LED_OUT (BIT0)
 
@@ -20,11 +23,12 @@ void test_LED(uint32_t, uint32_t);
 void main(void) {
     WDT_A->CTL = WDT_A_CTL_PW | WDT_A_CTL_HOLD;     // stop watchdog timer
 
-    const uint32_t frequency = _3_MHZ;
+    const uint32_t frequency = _12_MHZ;
 
     set_MCLK_DCO(frequency);
     output_MCLK();
-    test_LED(200000, frequency);
+
+    test_LED(_40_MICROS, frequency);
 
     while(1);
 }
